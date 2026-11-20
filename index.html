@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CivicPulse AI Hub — Offline Edge Prototype</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+    body {
+      font-family: 'DM Sans', sans-serif;
+      background-color: #FAF9F6;
+      color: #142321;
+    }
+    .font-mono-code {
+      font-family: 'Space Mono', monospace;
+    }
+    .pulse-dot {
+      animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: .4; }
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col">
+
+  <!-- Top Navigation & Edge Hardware Telemetry Bar -->
+  <header class="bg-[#0F2A26] text-[#FAF9F6] px-6 py-4 shadow-md">
+    <div class="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-4">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-lg bg-[#0D6E6E] flex items-center justify-center text-white font-bold text-xl">
+          <i class="fa-solid fa-microchip"></i>
+        </div>
+        <div>
+          <h1 class="text-xl font-extrabold tracking-tight flex items-center gap-2">
+            CivicPulse AI Hub
+            <span class="text-xs font-mono-code bg-[#E07A5F] text-white px-2 py-0.5 rounded">EDGE NODE v1.4</span>
+          </h1>
+          <p class="text-xs text-slate-300 font-mono-code">Raspberry Pi 5 • Quantized Llama-3-8B-Int4 • Local SQLite</p>
+        </div>
+      </div>
+
+      <!-- Simulated Hardware & Connectivity Controls -->
+      <div class="flex flex-wrap items-center gap-4 text-sm">
+        <div class="flex items-center gap-2 bg-[#163832] px-3 py-1.5 rounded-lg border border-teal-800">
+          <i class="fa-solid fa-solar-panel text-amber-400"></i>
+          <span class="font-mono-code text-xs">Solar Battery: <strong id="battery-level">94%</strong></span>
+        </div>
+
+        <button id="network-toggle" onclick="toggleNetwork()" class="flex items-center gap-2 px-3 py-1.5 rounded-lg font-mono-code text-xs font-bold transition cursor-pointer bg-amber-500/20 text-amber-300 border border-amber-500/40">
+          <span id="network-dot" class="w-2.5 h-2.5 rounded-full bg-amber-400 pulse-dot"></span>
+          <span id="network-label">OFFLINE (EDGE MODE)</span>
+        </button>
+
+        <button onclick="syncNow()" id="sync-btn" class="flex items-center gap-2 bg-[#0D6E6E] hover:bg-teal-700 text-white px-3 py-1.5 rounded-lg font-mono-code text-xs font-bold transition cursor-pointer">
+          <i class="fa-solid fa-rotate" id="sync-icon"></i>
+          <span>Mesh Sync (<span id="queue-count">2</span>)</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Workspace -->
+  <main class="flex-grow max-w-7xl w-full mx-auto px-6 py-8 grid grid-cols-1 lg:grid-cols-12 gap-8">
+
+    <!-- Left Sidebar: Module Selector & Local Dialect Voice Input -->
+    <aside class="lg:col-span-4 flex flex-col gap-6">
+      <div class="bg-white rounded-2xl p-5 shadow-sm border border-slate-200">
+        <p class="text-xs font-mono-code uppercase tracking-wider text-[#0D6E6E] font-bold mb-3">1. Select Edge Service</p>
+        <div class="flex flex-col gap-2.5">
+          <button onclick="switchTab('health')" id="tab-health" class="tab-btn w-full text-left p-3.5 rounded-xl border-2 border-[#0D6E6E] bg-[#EFF5F4] flex items-center gap-3.5 transition cursor-pointer">
+            <div class="w-10 h-10 rounded-lg bg-[#0D6E6E] text-white flex items-center justify-center text-lg">
+              <i class="fa-solid fa-stethoscope"></i>
+            </div>
+            <div>
+              <div class="font-bold text-[#142321]">Rural Health Triage</div>
+              <div class="text-xs text-slate-600">Offline symptom analysis & protocol</div>
+            </div>
+          </button>
+
+          <button onclick="switchTab('edu')" id="tab-edu" class="tab-btn w-full text-left p-3.5 rounded-xl border border-slate-200 hover:bg-slate-50 flex items-center gap-3.5 transition cursor-pointer">
+            <div class="w-10 h-10 rounded-lg bg-[#E07A5F] text-white flex items-center justify-center text-lg">
+              <i class="fa-solid fa-book-open-reader"></i>
+            </div>
+            <div>
+              <div class="font-bold text-[#142321]">Dialect AI Tutor</div>
+              <div class="text-xs text-slate-600">Interactive STEM & literacy lessons</div>
+            </div>
+          </button>
+
+          <button onclick="switchTab('climate')" id="tab-climate" class="tab-btn w-full text-left p-3.5 rounded-xl border border-slate-200 hover:bg-slate-50 flex items-center gap-3.5 transition cursor-pointer">
+            <div class="w-10 h-10 rounded-lg bg-[#142321] text-white flex items-center justify-center text-lg">
+              <i class="fa-solid fa-seedling"></i>
+            </div>
+            <div>
+              <div class="font-bold text-[#142321]">LoRaWAN Climate & Crop</div>
+              <div class="text-xs text-slate-600">Soil telemetry & irrigation alerts</div>
+            </div>
+          </button>
+        </div>
+      </div>
+
+      <!-- Simulated Whisper Edge Voice Assistant -->
+      <div class="bg-[#0F2A26] text-[#FAF9F6] rounded-2xl p-5 shadow-sm">
+        <div class="flex items-center justify-between mb-3">
+          <p class="text-xs font-mono-code uppercase tracking-wider text-[#E07A5F] font-bold">2. Local Voice Interface</p>
+          <select id="dialect-select" class="bg-[#163832] text-xs font-mono-code text-slate-200 border border-teal-800 rounded px-2 py-1">
+            <option value="en">English (Standard)</option>
+            <option value="hi">Hindi / Marathi Dialect</option>
+            <option value="sw">Swahili / Local</option>
+          </select>
+        </div>
+        <p class="text-xs text-slate-300 mb-4">On-device Whisper-Tiny ASR translates spoken queries without cloud connectivity.</p>
+        <button onclick="simulateVoiceInput()" id="voice-btn" class="w-full py-3 px-4 rounded-xl bg-[#E07A5F] hover:bg-[#d0694e] text-white font-bold text-sm flex items-center justify-center gap-2 transition cursor-pointer">
+          <i class="fa-solid fa-microphone"></i>
+          <span id="voice-btn-text">Simulate Voice Query</span>
+        </button>
+      </div>
+
+      <!-- Local SQLite Mesh Sync Queue -->
+      <div class="bg-white rounded-2xl p-5 shadow-sm border border-slate-200">
+        <div class="flex items-center justify-between mb-3">
+          <p class="text-xs font-mono-code uppercase tracking-wider text-[#0D6E6E] font-bold">3. Encrypted SQLite Queue</p>
+          <span class="text-[11px] font-mono-code bg-slate-100 px-2 py-0.5 rounded text-slate-600">AES-256</span>
+        </div>
+        <ul id="sync-log" class="space-y-2 text-xs font-mono-code text-slate-700 max-h-40 overflow-y-auto">
+          <li class="p-2 bg-amber-50 border border-amber-200 rounded flex justify-between">
+            <span>#TRI-104: Pediatric Fever</span>
+            <span class="text-amber-700 font-bold">PENDING</span>
+          </li>
+          <li class="p-2 bg-amber-50 border border-amber-200 rounded flex justify-between">
+            <span>#LORA-09: Sector B Soil Dry</span>
+            <span class="text-amber-700 font-bold">PENDING</span>
+          </li>
+        </ul>
+      </div>
+    </aside>
+
+    <!-- Right Main Panel: Active Edge Module -->
+    <section class="lg:col-span-8 flex flex-col">
+
+      <!-- MODULE 1: RURAL HEALTH TRIAGE -->
+      <div id="panel-health" class="bg-white rounded-2xl p-6 shadow-sm border border-slate-200 flex-grow flex flex-col">
+        <div class="border-b border-slate-100 pb-4 mb-5 flex flex-wrap justify-between items-center gap-2">
+          <div>
+            <span class="text-xs font-mono-code text-[#0D6E6E] uppercase font-bold">Edge Medical Inference</span>
+            <h2 class="text-2xl font-extrabold text-[#142321]">Rural Health Triage Assistant</h2>
+          </div>
+          <span class="text-xs font-mono-code bg-[#EFF5F4] text-[#0D6E6E] px-3 py-1 rounded-full font-bold">Latency: 140ms (Local NPU)</span>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+          <div>
+            <label class="block text-xs font-bold uppercase text-slate-600 mb-1">Patient Age & Group</label>
+            <input type="text" id="patient-age" value="34 yrs, Adult" class="w-full px-3.5 py-2.5 rounded-lg border border-slate-300 text-sm focus:outline-none focus:border-[#0D6E6E]">
+          </div>
+          <div>
+            <label class="block text-xs font-bold uppercase text-slate-600 mb-1">Vitals (Optional)</label>
+            <input type="text" id="patient-vitals" value="Temp: 102.4°F, SpO2: 96%" class="w-full px-3.5 py-2.5 rounded-lg border border-slate-300 text-sm focus:outline-none focus:border-[#0D6E6E]">
+          </div>
+        </div>
+
+        <div class="mb-4">
+          <label class="block text-xs font-bold uppercase text-slate-600 mb-1">Reported Symptoms</label>
+          <textarea id="patient-symptoms" rows="3" class="w-full px-3.5 py-2.5 rounded-lg border border-slate-300 text-sm focus:outline-none focus:border-[#0D6E6E]" placeholder="Describe symptoms...">High fever for 3 days, severe headache, joint pain, and mild dehydration.</textarea>
+        </div>
+
+        <div class="flex flex-wrap gap-2 mb-5">
+          <button onclick="setSymptomPreset('High fever for 3 days, severe headache, joint pain, and mild dehydration.')" class="text-xs bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded-lg font-medium cursor-pointer">Preset: Vector Fever</button>
+          <button onclick="setSymptomPreset('Persistent cough for 2 weeks, shortness of breath, mild chest tightness.')" class="text-xs bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded-lg font-medium cursor-pointer">Preset: Respiratory</button>
+          <button onclick="setSymptomPreset('Acute watery diarrhea and vomiting in child, dry lips, lethargy.')" class="text-xs bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded-lg font-medium cursor-pointer">Preset: Dehydration</button>
+        </div>
+
+        <button onclick="runHealthTriage()" class="w-full md:w-auto self-start bg-[#0D6E6E] hover:bg-teal-800 text-white font-bold px-6 py-3 rounded-xl text-sm flex items-center gap-2 transition cursor-pointer">
+          <i class="fa-solid fa-bolt"></i>
+          <span>Run Offline AI Triage</span>
+        </button>
+
+        <!-- Triage Output Box -->
+        <div id="triage-result" class="mt-6 bg-[#EFF5F4] border-l-4 border-[#0D6E6E] rounded-r-xl p-5">
+          <div class="flex items-center justify-between mb-2">
+            <span class="font-bold text-[#0D6E6E] text-sm uppercase font-mono-code">AI Assessment Ready</span>
+            <span class="text-xs font-mono-code bg-[#E07A5F] text-white px-2.5 py-0.5 rounded font-bold">PRIORITY: MODERATE-HIGH</span>
+          </div>
+          <p class="text-sm text-[#142321] font-medium mb-2"><strong>Suspected Condition:</strong> Vector-borne viral fever (Dengue/Malaria screening advised).</p>
+          <ul class="text-sm text-slate-700 list-disc pl-5 space-y-1">
+            <li>Administer Oral Rehydration Salts (ORS) immediately.</li>
+            <li>Perform rapid antigen dipstick test available in Village Kit #2.</li>
+            <li>Queued encrypted referral packet for District Clinic Doctor review upon next mesh sync.</li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- MODULE 2: DIALECT AI TUTOR -->
+      <div id="panel-edu" class="hidden bg-white rounded-2xl p-6 shadow-sm border border-slate-200 flex-grow flex-col">
+        <div class="border-b border-slate-100 pb-4 mb-5 flex flex-wrap justify-between items-center gap-2">
+          <div>
+            <span class="text-xs font-mono-code text-[#E07A5F] uppercase font-bold">Offline Adaptive Learning</span>
+            <h2 class="text-2xl font-extrabold text-[#142321]">Local Dialect STEM Tutor</h2>
+          </div>
+          <span class="text-xs font-mono-code bg-orange-50 text-[#E07A5F] px-3 py-1 rounded-full font-bold">Zero-Data Curriculum</span>
+        </div>
+
+        <div class="flex gap-2 mb-4">
+          <input type="text" id="tutor-question" value="How do solar panels generate electricity for our village?" class="flex-grow px-4 py-2.5 rounded-xl border border-slate-300 text-sm focus:outline-none focus:border-[#E07A5F]">
+          <button onclick="askTutor()" class="bg-[#E07A5F] hover:bg-[#d0694e] text-white font-bold px-5 py-2.5 rounded-xl text-sm cursor-pointer">Ask AI</button>
+        </div>
+
+        <div class="flex flex-wrap gap-2 mb-5">
+          <button onclick="setTutorPreset('How do solar panels generate electricity for our village?')" class="text-xs bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded-lg font-medium cursor-pointer">Solar Energy Basics</button>
+          <button onclick="setTutorPreset('Why is crop rotation important for soil nitrogen?')" class="text-xs bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded-lg font-medium cursor-pointer">Soil Science</button>
+          <button onclick="setTutorPreset('How do we purify drinking water using filtration?')" class="text-xs bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded-lg font-medium cursor-pointer">Clean Water Chemistry</button>
+        </div>
+
+        <div id="tutor-output" class="bg-[#FAF9F6] border border-slate-200 rounded-xl p-5 flex-grow flex flex-col justify-between">
+          <div>
+            <div class="flex items-center gap-2 text-xs font-mono-code text-[#0D6E6E] font-bold mb-2">
+              <i class="fa-solid fa-graduation-cap"></i>
+              <span>LOCALIZED LESSON RESPONSE</span>
+            </div>
+            <p id="tutor-text" class="text-base text-[#142321] leading-relaxed mb-4">
+              Sunlight carries tiny packets of energy called <strong>photons</strong>. When photons hit the silicon layers inside our hub's solar panel, they knock electrons loose—creating a flow of electric current stored in our battery bank for night-time classes!
+            </p>
+          </div>
+          <div class="bg-[#EFF5F4] p-3.5 rounded-lg flex items-center justify-between">
+            <span class="text-xs font-bold text-[#0D6E6E]">Quick Check: What particle moves to create electric current?</span>
+            <button onclick="alert('Correct! Electrons flow through the circuit to power the hub.')" class="text-xs bg-[#0D6E6E] text-white px-3 py-1.5 rounded font-bold cursor-pointer">Answer: Electrons</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- MODULE 3: LORAWAN CLIMATE & CROP -->
+      <div id="panel-climate" class="hidden bg-white rounded-2xl p-6 shadow-sm border border-slate-200 flex-grow flex-col">
+        <div class="border-b border-slate-100 pb-4 mb-5 flex flex-wrap justify-between items-center gap-2">
+          <div>
+            <span class="text-xs font-mono-code text-[#0D6E6E] uppercase font-bold">LoRaWAN Long-Range Telemetry</span>
+            <h2 class="text-2xl font-extrabold text-[#142321]">Precision Agriculture & Climate Alerts</h2>
+          </div>
+          <span class="text-xs font-mono-code bg-emerald-50 text-emerald-800 px-3 py-1 rounded-full font-bold">4 Active Field Nodes</span>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+          <div class="bg-[#EFF5F4] p-4 rounded-xl">
+            <p class="text-xs font-mono-code text-slate-600 uppercase">Soil Moisture (Avg)</p>
+            <p id="soil-val" class="text-3xl font-extrabold text-[#0D6E6E] my-1">24%</p>
+            <p class="text-xs text-amber-700 font-bold">Low — Irrigation Recommended</p>
+          </div>
+          <div class="bg-[#EFF5F4] p-4 rounded-xl">
+            <p class="text-xs font-mono-code text-slate-600 uppercase">Water Saved (Cycle)</p>
+            <p class="text-3xl font-extrabold text-[#142321] my-1">70%</p>
+            <p class="text-xs text-slate-600">Vs. traditional flood irrigation</p>
+          </div>
+          <div class="bg-[#EFF5F4] p-4 rounded-xl">
+            <p class="text-xs font-mono-code text-slate-600 uppercase">Micro-Climate Alert</p>
+            <p class="text-xl font-extrabold text-[#E07A5F] my-1">Heat Spike</p>
+            <p class="text-xs text-slate-600">39°C forecast in 6 hours</p>
+          </div>
+        </div>
+
+        <div class="bg-[#0F2A26] text-white rounded-xl p-5 flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <h3 class="font-bold text-lg text-[#FAF9F6]">Automated Drip Valve Control (LoRa Node #02)</h3>
+            <p class="text-xs text-slate-300">Trigger precision 20-minute watering cycle before peak afternoon heat.</p>
+          </div>
+          <button onclick="triggerIrrigation()" id="irrigate-btn" class="bg-[#E07A5F] hover:bg-[#d0694e] text-white font-bold px-5 py-2.5 rounded-xl text-sm cursor-pointer">
+            Activate Drip Pulse
+          </button>
+        </div>
+      </div>
+
+    </section>
+  </main>
+
+  <script>
+    let isOnline = false;
+    let queueItems = [
+      { id: '#TRI-104', label: 'Pediatric Fever', status: 'PENDING' },
+      { id: '#LORA-09', label: 'Sector B Soil Dry', status: 'PENDING' }
+    ];
+
+    function renderQueue() {
+      const log = document.getElementById('sync-log');
+      const count = document.getElementById('queue-count');
+      const pendingCount = queueItems.filter(i => i.status === 'PENDING').length;
+      count.textContent = pendingCount;
+
+      log.innerHTML = queueItems.map(item => `
+        <li class="p-2 ${item.status === 'SYNCED' ? 'bg-emerald-50 border-emerald-200' : 'bg-amber-50 border-amber-200'} border rounded flex justify-between">
+          <span>${item.id}: ${item.label}</span>
+          <span class="${item.status === 'SYNCED' ? 'text-emerald-700' : 'text-amber-700'} font-bold">${item.status}</span>
+        </li>
+      `).join('');
+    }
+
+    function addQueueItem(id, label) {
+      queueItems.unshift({ id, label, status: isOnline ? 'SYNCED' : 'PENDING' });
+      renderQueue();
+    }
+
+    function toggleNetwork() {
+      isOnline = !isOnline;
+      const btn = document.getElementById('network-toggle');
+      const dot = document.getElementById('network-dot');
+      const label = document.getElementById('network-label');
+
+      if (isOnline) {
+        btn.className = 'flex items-center gap-2 px-3 py-1.5 rounded-lg font-mono-code text-xs font-bold transition cursor-pointer bg-emerald-500/20 text-emerald-300 border border-emerald-500/40';
+        dot.className = 'w-2.5 h-2.5 rounded-full bg-emerald-400';
+        label.textContent = 'MESH UPLINK ONLINE';
+        syncNow();
+      } else {
+        btn.className = 'flex items-center gap-2 px-3 py-1.5 rounded-lg font-mono-code text-xs font-bold transition cursor-pointer bg-amber-500/20 text-amber-300 border border-amber-500/40';
+        dot.className = 'w-2.5 h-2.5 rounded-full bg-amber-400 pulse-dot';
+        label.textContent = 'OFFLINE (EDGE MODE)';
+      }
+    }
+
+    function syncNow() {
+      const icon = document.getElementById('sync-icon');
+      icon.classList.add('fa-spin');
+      setTimeout(() => {
+        icon.classList.remove('fa-spin');
+        if (!isOnline) {
+          alert('No WAN backhaul detected. Packets remain safely encrypted in local SQLite until mesh relay connects.');
+          return;
+        }
+        queueItems = queueItems.map(item => ({ ...item, status: 'SYNCED' }));
+        renderQueue();
+      }, 600);
+    }
+
+    function switchTab(tab) {
+      ['health', 'edu', 'climate'].forEach(t => {
+        document.getElementById('panel-' + t).classList.add('hidden');
+        document.getElementById('panel-' + t).classList.remove('flex');
+        const btn = document.getElementById('tab-' + t);
+        btn.classList.remove('border-2', 'border-[#0D6E6E]', 'bg-[#EFF5F4]');
+        btn.classList.add('border', 'border-slate-200');
+      });
+
+      const activePanel = document.getElementById('panel-' + tab);
+      activePanel.classList.remove('hidden');
+      activePanel.classList.add('flex');
+
+      const activeBtn = document.getElementById('tab-' + tab);
+      activeBtn.classList.remove('border', 'border-slate-200');
+      activeBtn.classList.add('border-2', 'border-[#0D6E6E]', 'bg-[#EFF5F4]');
+    }
+
+    function setSymptomPreset(text) {
+      document.getElementById('patient-symptoms').value = text;
+    }
+
+    function runHealthTriage() {
+      const symptoms = document.getElementById('patient-symptoms').value.toLowerCase();
+      const resultBox = document.getElementById('triage-result');
+      let priority = 'MODERATE';
+      let condition = 'General viral syndrome';
+      let steps = [
+        'Monitor temperature every 4 hours and maintain hydration.',
+        'Log follow-up vitals into local village node.'
+      ];
+
+      if (symptoms.includes('cough') || symptoms.includes('breath')) {
+        priority = 'HIGH';
+        condition = 'Acute Lower Respiratory Infection';
+        steps = [
+          'Check respiratory rate and pulse oximetry immediately.',
+          'Isolate patient and prepare referral transport to primary clinic.',
+          'Priority packet flagged for Doctor Mesh Sync.'
+        ];
+      } else if (symptoms.includes('diarrhea') || symptoms.includes('vomiting')) {
+        priority = 'HIGH';
+        condition = 'Acute Gastroenteritis & Dehydration Risk';
+        steps = [
+          'Begin WHO-recommended low-osmolarity ORS + Zinc supplementation.',
+          'Flagged for immediate community health worker follow-up.'
+        ];
+      } else if (symptoms.includes('fever') || symptoms.includes('joint')) {
+        priority = 'MODERATE-HIGH';
+        condition = 'Vector-borne viral fever (Dengue/Malaria screening advised)';
+        steps = [
+          'Administer Oral Rehydration Salts (ORS) immediately.',
+          'Perform rapid antigen dipstick test available in Village Kit #2.',
+          'Queued encrypted referral packet for District Clinic Doctor review.'
+        ];
+      }
+
+      const id = '#TRI-' + Math.floor(105 + Math.random() * 890);
+      addQueueItem(id, condition.split(' ')[0] + ' Triage');
+
+      resultBox.innerHTML = `
+        <div class="flex items-center justify-between mb-2">
+          <span class="font-bold text-[#0D6E6E] text-sm uppercase font-mono-code">AI Assessment Logged (${id})</span>
+          <span class="text-xs font-mono-code bg-[#E07A5F] text-white px-2.5 py-0.5 rounded font-bold">PRIORITY: ${priority}</span>
+        </div>
+        <p class="text-sm text-[#142321] font-medium mb-2"><strong>Suspected Condition:</strong> ${condition}</p>
+        <ul class="text-sm text-slate-700 list-disc pl-5 space-y-1">
+          ${steps.map(s => `<li>${s}</li>`).join('')}
+        </ul>
+      `;
+    }
+
+    function setTutorPreset(q) {
+      document.getElementById('tutor-question').value = q;
+      askTutor();
+    }
+
+    function askTutor() {
+      const q = document.getElementById('tutor-question').value.toLowerCase();
+      const out = document.getElementById('tutor-text');
+      if (q.includes('crop') || q.includes('soil')) {
+        out.innerHTML = 'Legumes like beans and lentils partner with friendly soil bacteria to capture <strong>nitrogen</strong> from the air and store it in roots—naturally fertilizing the soil for the next grain harvest without expensive chemicals!';
+      } else if (q.includes('water') || q.includes('purify')) {
+        out.innerHTML = 'Layered bio-sand filtration uses gravel, fine sand, and activated charcoal to trap sediment and microbes, followed by solar UV disinfection (SODIS) to make water safe to drink.';
+      } else {
+        out.innerHTML = 'Sunlight carries tiny packets of energy called <strong>photons</strong>. When photons hit the silicon layers inside our hub\'s solar panel, they knock electrons loose—creating a flow of electric current stored in our battery bank for night-time classes!';
+      }
+    }
+
+    function triggerIrrigation() {
+      const btn = document.getElementById('irrigate-btn');
+      const soil = document.getElementById('soil-val');
+      btn.textContent = 'Irrigating (LoRa Signal Sent)...';
+      btn.disabled = true;
+      setTimeout(() => {
+        soil.textContent = '42%';
+        btn.textContent = 'Cycle Complete (Optimal)';
+        addQueueItem('#LORA-' + Math.floor(10 + Math.random() * 89), 'Drip Pulse Logged');
+      }, 900);
+    }
+
+    function simulateVoiceInput() {
+      const btnText = document.getElementById('voice-btn-text');
+      const dialect = document.getElementById('dialect-select').value;
+      btnText.textContent = 'Listening (Whisper-Tiny Edge)...';
+      setTimeout(() => {
+        switchTab('health');
+        const sample = dialect === 'hi'
+          ? 'Translated [Hindi]: High fever for 3 days, severe headache, joint pain, and mild dehydration.'
+          : 'Voice Transcribed: High fever for 3 days, severe headache, joint pain, and mild dehydration.';
+        document.getElementById('patient-symptoms').value = sample;
+        runHealthTriage();
+        btnText.textContent = 'Simulate Voice Query';
+      }, 800);
+    }
+  </script>
+</body>
+</html>
